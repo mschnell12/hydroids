@@ -1,0 +1,34 @@
+---
+title: "hydroids2024"
+author: "Marina Schnell"
+date: "2024-09-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-packages}
+library(tidyverse)
+library(readxl)
+library(forcats)
+```
+
+```{r load-data}
+hydroids <- read_xlsx("data/NeCSA24miscellanea.xlsx", sheet = "data")
+```
+
+```{r hydroid-plot}
+hydroids %>%
+  mutate(tide_ht = factor(tide_ht)) %>%
+  mutate(tide_ht = fct_relevel(tide_ht, c("L", "M", "H"))) %>%
+  filter(subquadrats != "n",
+         species != "none") %>%
+  group_by(tide_ht, species) %>%
+  mutate(proportion = as.numeric(subquadrats)/25) %>%
+  summarise(mean_prop = mean(proportion)) %>%
+  ggplot(mapping = aes(tide_ht, mean_prop, fill = species)) +
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d()
+```
