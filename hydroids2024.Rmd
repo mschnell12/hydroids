@@ -13,23 +13,86 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(forcats)
-library(usethis)
+
+se <- function(x) sd(x)/sqrt(length(x))
 ```
 
 ```{r load-data}
 hydroids <- read_xlsx("data/NeCSA24miscellanea.xlsx", sheet = "data")
 ```
 
-```{r hydroid-plot}
-hydroids %>%
+```{r expand-and-join}
+
+exp_hydroids <- expand(hydroids,
+                       tide_ht,
+                       number,
+                       species) %>%
+  left_join(hydroids,
+            by = join_by(tide_ht, number, species)) %>%
+  mutate(subquadrats = as.numeric(subquadrats)) %>%
+  mutate(subquadrats = replace_na(subquadrats, 0)) %>%
+  mutate(proportion = subquadrats/25) %>%
+  filter(!(tide_ht == "L" & number == 3)
+         & !(tide_ht == "L" & number == 4)
+         & !(tide_ht == "L" & number == 6)) %>%
   mutate(tide_ht = factor(tide_ht)) %>%
-  mutate(tide_ht = fct_relevel(tide_ht, c("L", "M", "H"))) %>%
-  filter(subquadrats != "n",
-         species != "none") %>%
+  mutate(tide_ht = fct_relevel(tide_ht, c("L", "M", "H")))
+
+```
+
+```{r hydroid-plot-proportion}
+
+exp_hydroids %>%
+  filter(species %in% c("Clava_multicornis",
+                        "Dynamena_pumila",
+                        "Laomedea_flexuosa",
+                        "Sertularella_rugosa")) %>%
   group_by(tide_ht, species) %>%
   mutate(proportion = as.numeric(subquadrats)/25) %>%
-  summarise(mean_prop = mean(proportion)) %>%
+  summarise(mean_prop = mean(proportion),
+            se_prop = se(proportion)) %>%
+  mutate(ymin_prop = mean_prop - se_prop) %>%
+  mutate(ymin_prop = case_when(ymin_prop < 0 ~ 0,
+                          TRUE ~ ymin_prop)) %>%
+  mutate(ymax_prop = mean_prop + se_prop) %>% 
   ggplot(mapping = aes(tide_ht, mean_prop, fill = species)) +
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d() +
+  geom_errorbar(aes(ymin = ymin_prop, ymax = ymax_prop),
+                width=.3,
+                position = position_dodge(.9))
+```
+
+```{r hydroid-plot-mean-number}
+exp_hydroids %>%
+  filter(species %in% c("Clava_multicornis",
+                        "Dynamena_pumila",
+                        "Laomedea_flexuosa",
+                        "Sertularella_rugosa")) %>%
+  group_by(tide_ht, species) %>%
+  summarise(mean_num = mean(subquadrats),
+            se_num = se(subquadrats)) %>%
+  mutate(ymin_num = mean_num - se_num) %>%
+  mutate(ymin_num = case_when(ymin_num < 0 ~ 0,
+                          TRUE ~ ymin_num)) %>%
+  mutate(ymax_num = mean_num + se_num) %>% 
+  ggplot(mapping = aes(tide_ht, mean_num, fill = species)) +
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d() +
+  geom_errorbar(aes(ymin = ymin_num, ymax = ymax_num),
+                width=.3,
+                position = position_dodge(.9))
+```
+
+```{r hydroid-plot-total}
+exp_hydroids %>%
+  filter(species %in% c("Clava_multicornis",
+                        "Dynamena_pumila",
+                        "Laomedea_flexuosa",
+                        "Sertularella_rugosa")) %>%
+  group_by(tide_ht, species) %>%
+  summarise(sum_subquadrats = sum(subquadrats)) %>%
+  ggplot(mapping = aes(tide_ht, sum_subquadrats, fill = species)) +
   geom_col(position = "dodge") +
   scale_fill_viridis_d()
 ```
