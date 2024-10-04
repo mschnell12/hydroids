@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(forcats)
+library(FSA)
 
 se <- function(x) sd(x)/sqrt(length(x))
 ```
@@ -42,6 +43,8 @@ exp_hydroids <- expand(hydroids,
 
 ```{r hydroid-plot-proportion}
 
+# error bars represent +/- 1 standard error
+
 exp_hydroids %>%
   filter(species %in% c("Clava_multicornis",
                         "Dynamena_pumila",
@@ -60,7 +63,10 @@ exp_hydroids %>%
   scale_fill_viridis_d() +
   geom_errorbar(aes(ymin = ymin_prop, ymax = ymax_prop),
                 width=.3,
-                position = position_dodge(.9))
+                position = position_dodge(.9)) +
+  labs(x = "Tide Height",
+       y = "Mean Proportion")
+  
 ```
 
 ```{r hydroid-plot-mean-number}
@@ -76,12 +82,34 @@ exp_hydroids %>%
   mutate(ymin_num = case_when(ymin_num < 0 ~ 0,
                           TRUE ~ ymin_num)) %>%
   mutate(ymax_num = mean_num + se_num) %>% 
-  ggplot(mapping = aes(tide_ht, mean_num, fill = species)) +
+  mutate(tide_ht_2 = case_when(tide_ht == "L" ~ "Low",
+                               tide_ht == "M" ~ "Mid",
+                               tide_ht == "H" ~ "High")) %>%
+  mutate(tide_ht_2 = factor(tide_ht_2)) %>%
+  mutate(tide_ht_2 = fct_relevel(tide_ht_2, c("Low", "Mid", "High"))) %>%
+  ggplot(mapping = aes(tide_ht_2, mean_num, fill = species)) +
   geom_col(position = "dodge") +
   scale_fill_viridis_d() +
   geom_errorbar(aes(ymin = ymin_num, ymax = ymax_num),
                 width=.3,
-                position = position_dodge(.9))
+                position = position_dodge(.9)) +
+  labs(x = "Tide Height",
+       y = "Mean Number of Quadrats (out of 25)",
+       title = "Presence of Hydroids in 2024 NeCSA Survey",
+       fill = "Species") +
+  scale_fill_manual(labels = c("Clava_multicornis" = "Clava multicornis",
+                               "Dynamena_pumila" = "Dynamena pumila",
+                               "Laomedea_flexuosa" = "Laomedea flexuosa",
+                               "Sertularella_rugosa" = "Sertularella rugosa"),
+                       values = c("Clava_multicornis" = "#A4B9D2",
+                                  "Dynamena_pumila" = "#375A63",
+                                  "Laomedea_flexuosa" = "#946DB7",
+                                  "Sertularella_rugosa" = "#AE875B")) +
+  theme(legend.text = element_text(face="italic")) +
+  theme(axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0))) +
+  theme(axis.title.x = element_text(margin = margin(t = 8, r = 0, b = 0, l = 0))) +
+  ylim(0,25)
+
 ```
 
 ```{r hydroid-plot-total}
@@ -95,4 +123,24 @@ exp_hydroids %>%
   ggplot(mapping = aes(tide_ht, sum_subquadrats, fill = species)) +
   geom_col(position = "dodge") +
   scale_fill_viridis_d()
+```
+
+```{r KW-test-dyna_p}
+
+dyna_p <- exp_hydroids %>%
+  filter(species == "Dynamena_pumila")
+
+kruskal.test(proportion ~ tide_ht, data = dyna_p)
+
+dunnTest(dyna_p$proportion ~ dyna_p$tide_ht, method = "bh")
+```
+
+```{r KW-test-dyna_p}
+
+laom_f <- exp_hydroids %>%
+  filter(species == "Laomedea_flexuosa")
+
+kruskal.test(proportion ~ tide_ht, data = laom_f)
+
+dunnTest(laom_f$proportion ~ laom_f$tide_ht, method = "bh")
 ```
